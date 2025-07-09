@@ -82,8 +82,8 @@ OuterLoop:
 
 	d.ipAddress = ipAddress
 
-	log.Printf("Wait for vm %s startup application for 30 second\n", ipAddress)
-	time.Sleep(30 * time.Second)
+	log.Printf("Wait for vm %s startup application for 6 minute\n", ipAddress)
+	time.Sleep(6 * time.Minute)
 
 	lbUrl = lbUrl + "/backend"
 
