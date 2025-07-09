@@ -176,7 +176,7 @@ func (m *VirtController) createVM(ctx context.Context, wg *sync.WaitGroup) error
 
 		if m.loadBalancer != nil {
 			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 				defer cancel()
 				instanceMng.RegisterIP(os.Getenv("LOAD_BALANCER_URL"), ctx)
 			}()
