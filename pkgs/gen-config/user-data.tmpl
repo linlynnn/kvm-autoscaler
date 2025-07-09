@@ -23,8 +23,6 @@ runcmd:
   - systemctl restart systemd-resolved
   - apt update
   - apt upgrade -y
-  - apt install -y qemu-guest-agent
-  - systemctl start qemu-guest-agent.service
   - apt install -y software-properties-common
   - apt-add-repository --yes --update ppa:ansible/ansible
   - apt install -y ansible
