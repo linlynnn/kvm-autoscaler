@@ -1,0 +1,31 @@
+#cloud-config
+hostname: {{.HOSTNAME}}
+users:
+  - name: ubuntu
+    ssh-authorized-keys:
+      - {{.SSH_PUBLIC_KEY}}
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+ssh_pwauth: false
+disable_root: true
+package_update: true
+package_upgrade: true
+
+cloud_config_modules:
+  - runcmd
+
+cloud_final_modules:
+  - scripts-user
+
+runcmd:
+  - touch runcmd-works
+  - sed -i 's/^#*DNS=.*/DNS=8.8.8.8 1.1.1.1/' /etc/systemd/resolved.conf
+  - systemctl restart systemd-resolved
+  - apt update
+  - apt upgrade -y
+  - apt install -y qemu-guest-agent
+  - systemctl start qemu-guest-agent.service
+  - apt install -y software-properties-common
+  - apt-add-repository --yes --update ppa:ansible/ansible
+  - apt install -y ansible
+  - ansible-pull -U https://github.com/linlynnn/backend-lb-testing.git site.yml -i localhost -d /home/ubuntu/backend 
