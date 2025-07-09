@@ -66,9 +66,10 @@ func GenMetaDataInstanceConfig(
 		log.Println(err)
 	}
 
-	metaTmpl, err := template.New("meta-data").Parse("pkgs/gen-config/meta-data.tmpl")
+	// In GenMetaDataInstanceConfig, load embedded templates instead of reading from disk
+	tpl, err := LoadTemplates()
 	if err != nil {
-		log.Println(err)
+		return err
 	}
 	metaData := map[string]string{
 		"INSTANCE_ID":    "instance-" + id,
@@ -83,7 +84,7 @@ func GenMetaDataInstanceConfig(
 	}
 	defer outFile.Close()
 
-	err = metaTmpl.Execute(outFile, metaData)
+	err = tpl.ExecuteTemplate(outFile, "meta-data.tmpl", metaData)
 	if err != nil {
 		return nil
 	}
@@ -104,9 +105,10 @@ func GenUserDataInstanceConfig(
 		log.Println(err)
 	}
 
-	userTmpl, err := template.ParseFiles("pkgs/gen-config/user-data.tmpl")
+	// In GenUserDataInstanceConfig, load embedded templates instead of reading from disk
+	tpl, err := LoadTemplates()
 	if err != nil {
-		log.Println(err)
+		return err
 	}
 	metaData := map[string]string{
 		"HOSTNAME":       "instance-" + id,
@@ -121,7 +123,7 @@ func GenUserDataInstanceConfig(
 	}
 	defer outFile.Close()
 
-	err = userTmpl.Execute(outFile, metaData)
+	err = tpl.ExecuteTemplate(outFile, "user-data.tmpl", metaData)
 	if err != nil {
 		return nil
 	}
