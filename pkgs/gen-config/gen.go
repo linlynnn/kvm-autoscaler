@@ -18,7 +18,6 @@ func GenQcow2DiskImage(id string) error {
 		"-F",
 		"qcow2",
 		"/var/lib/libvirt/images/overlay-"+id+".qcow2",
-		"5G",
 	)
 
 	cmd.Stdout = os.Stdout
@@ -150,11 +149,23 @@ func GenVirtInstanceConfig(
 		return "", err
 	}
 
+	instanceMemory := os.Getenv("INSTANCE_MEMORY")
+	if instanceMemory == "" {
+		instanceMemory = "2048"
+	}
+
+	instanceVcpu := os.Getenv("INSTANCE_VCPU")
+	if instanceVcpu == "" {
+		instanceVcpu = "2"
+	}
+
 	virtData := map[string]string{
-		"DOMAIN_NAME":    "instance-" + id,
-		"GA_SOCKET_NAME": "ga-socket-" + id,
-		"OVERLAY_IMAGE":  "overlay-" + id,
-		"CDROM_IMAGE":    "cdrom-" + id,
+		"DOMAIN_NAME":     "instance-" + id,
+		"GA_SOCKET_NAME":  "ga-socket-" + id,
+		"OVERLAY_IMAGE":   "overlay-" + id,
+		"CDROM_IMAGE":     "cdrom-" + id,
+		"INSTANCE_MEMORY": instanceMemory,
+		"INSTANCE_VCPU":   instanceVcpu,
 	}
 
 	outputFileName := "instance-" + id

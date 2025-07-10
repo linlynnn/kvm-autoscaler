@@ -3,8 +3,8 @@ package genconfig
 func GetVirtTemplate() string {
 	return `<domain type='kvm'>
   <name>{{.DOMAIN_NAME}}</name>
-  <memory unit='MiB'>2048</memory>
-  <vcpu placement='static'>2</vcpu>
+  <memory unit='MiB'>{{.INSTANCE_MEMORY}}</memory>
+  <vcpu placement='static'>{{.INSTANCE_VCPU}}</vcpu>
 
   <os>
     <type arch='x86_64' machine='pc'>hvm</type>
