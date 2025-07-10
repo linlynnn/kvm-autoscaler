@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	libvirt "libvirt.org/go/libvirt"
@@ -82,8 +83,13 @@ OuterLoop:
 
 	d.ipAddress = ipAddress
 
-	log.Printf("Wait for vm %s startup application for 6 minute\n", ipAddress)
-	time.Sleep(6 * time.Minute)
+	coldStartTimeout, err := strconv.Atoi(os.Getenv("COLD_START_TIMEOUT_MIN"))
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Printf("Wait for vm %s startup application for %d minute\n", ipAddress, coldStartTimeout)
+	time.Sleep(time.Duration(coldStartTimeout) * time.Minute)
 
 	lbUrl = lbUrl + "/backend"
 
@@ -144,8 +150,6 @@ func (d *VirtInstanceManager) GetStatus() VMState {
 }
 
 func (d *VirtInstanceManager) DeRegisterIP(lbUrl string) {
-	log.Printf("Draining connection for %s\n", d.ipAddress)
-	time.Sleep(30 * time.Second)
 	lbUrl = lbUrl + "/backend"
 
 	payload := map[string]string{
