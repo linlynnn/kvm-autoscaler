@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -167,7 +168,9 @@ func (m *VirtController) createVM(ctx context.Context, wg *sync.WaitGroup) error
 		instanceId := "instance-" + uuid.String()
 		instanceMng := instance.NewVirtInstanceManager(domain, instanceId)
 
+		m.Lock()
 		m.MapInstanceIdToInstance[instanceId] = instanceMng
+		m.Unlock()
 
 		if err := domain.Create(); err != nil {
 			done <- err
@@ -212,7 +215,30 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, ctx c
 
 		// deregisterIP
 		if m.loadBalancer != nil {
-			inst.DeRegisterIP(os.Getenv("LOAD_BALANCER_URL"))
+
+			loadBalancerUrl := os.Getenv("LOAD_BALANCER_URL")
+			if loadBalancerUrl == "" {
+				log.Println("LOAD_BALANCER_URL is not defined")
+				return
+			}
+
+			inst.DeRegisterIP(loadBalancerUrl)
+
+			drainingTime := os.Getenv("DRAINING_TIME_SEC")
+			if drainingTime == "" {
+				log.Println("DRAINING_TIME is not defined")
+				return
+			}
+
+			drainingTimeInt, err := strconv.Atoi(drainingTime)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			log.Printf("Draining connection %s\n", inst.GetID())
+			time.Sleep(time.Duration(drainingTimeInt) * time.Second)
+
 		}
 
 		err := inst.Shutdown()
@@ -220,7 +246,9 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, ctx c
 			done <- err
 		}
 
+		m.Lock()
 		delete(m.MapInstanceIdToInstance, inst.GetID())
+		m.Unlock()
 
 		done <- nil
 
@@ -246,6 +274,7 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, ctx c
 func (m *VirtController) GetRunningInstance() (int, []instance.InstanceManager, error) {
 	runningInstances := []instance.InstanceManager{}
 
+	m.Lock()
 	for _, instanceMng := range m.MapInstanceIdToInstance {
 		instanceStatus := instanceMng.GetStatus()
 
@@ -254,6 +283,7 @@ func (m *VirtController) GetRunningInstance() (int, []instance.InstanceManager, 
 		}
 
 	}
+	m.Unlock()
 
 	return len(runningInstances), runningInstances, nil
 
