@@ -197,12 +197,9 @@ func (m *VirtController) createVM(ctx context.Context, wg *sync.WaitGroup) error
 	case err := <-done:
 		if err != nil {
 			log.Println(err)
-			return err
 		}
-
+		return err
 	}
-
-	return nil
 
 }
 
