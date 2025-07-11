@@ -1,11 +1,14 @@
 package genconfig
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"text/template"
+
+	"github.com/linlynnn/kvm-autoscaler/pkgs/helper"
 )
 
 // overlay: {jammy-base-image}
@@ -13,8 +16,17 @@ func GenQcow2DiskImage(id string) error {
 	//sudo qemu-img create -f qcow2 -b "$BASE_IMAGE" -F qcow2 "${IMG_REGISTRY}/${OVERLAY_IMAGE}" 5G
 	log.Println("Generating qcow2 disk-image:", id)
 
+	baseImageName := os.Getenv("BASE_IMAGE_NAME")
+	if baseImageName == "" {
+		baseImageName = "jammy-server-cloudimg-amd64.img"
+	}
+
+	if !helper.FileExists("/var/lib/libvirt/images/" + baseImageName) {
+		return fmt.Errorf("No base image exist")
+	}
+
 	cmd := exec.Command("sudo", "qemu-img", "create", "-f", "qcow2", "-b",
-		"jammy-server-cloudimg-amd64.img",
+		baseImageName,
 		"-F",
 		"qcow2",
 		"/var/lib/libvirt/images/overlay-"+id+".qcow2",
