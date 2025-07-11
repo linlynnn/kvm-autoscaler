@@ -55,9 +55,6 @@ func (m *VirtController) ScaleUp(numToAdd int) {
 
 	var wg sync.WaitGroup
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	now := time.Now()
 
 	if now.Sub(m.LastScaleUp) < m.ScaleUpCoolDown {
@@ -73,7 +70,7 @@ func (m *VirtController) ScaleUp(numToAdd int) {
 	for i := 0; i < numToAdd; i++ {
 		// can be concurrent
 		wg.Add(1)
-		go m.createVM(ctx, &wg)
+		go m.createVM(&wg)
 	}
 
 	wg.Wait()
@@ -110,96 +107,72 @@ func (m *VirtController) ScaleDown(instancesToRemove []instance.InstanceManager)
 
 }
 
-func (m *VirtController) createVM(ctx context.Context, wg *sync.WaitGroup) error {
+func (m *VirtController) createVM(wg *sync.WaitGroup) error {
 	defer wg.Done()
 
-	done := make(chan error, 1)
-
-	go func() {
-		uuid := uuid.New()
-		log.Printf("Creating VM instance-%v\n", uuid.String())
-		if err := genconfig.GenQcow2DiskImage(uuid.String()); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		if err := genconfig.GenMetaDataInstanceConfig(uuid.String()); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		if err := genconfig.GenUserDataInstanceConfig(uuid.String(), os.Getenv("SSH_PUBLIC_KEY")); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		if err := genconfig.GenCdRomDiskImage(uuid.String()); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		virtInstanceConfigPath, err := genconfig.GenVirtInstanceConfig(uuid.String())
-		if err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		// read xml file and then register
-		xmlBytes, err := os.ReadFile(virtInstanceConfigPath)
-		if err != nil {
-			log.Fatalf("Failed to read XML file: %v", err)
-			done <- err
-		}
-
-		domainXML := string(xmlBytes)
-
-		domain, err := m.conn.DomainDefineXML(domainXML)
-		if err != nil {
-			log.Fatalf("Failed to define domain: %v", err)
-			done <- err
-			return
-		}
-
-		instanceId := "instance-" + uuid.String()
-		instanceMng := instance.NewVirtInstanceManager(domain, instanceId)
-
-		m.Lock()
-		m.MapInstanceIdToInstance[instanceId] = instanceMng
-		m.Unlock()
-
-		if err := domain.Create(); err != nil {
-			done <- err
-			return
-		}
-
-		if m.loadBalancer != nil {
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-				defer cancel()
-				instanceMng.RegisterIP(os.Getenv("LOAD_BALANCER_URL"), ctx)
-			}()
-		}
-
-		log.Printf("Created VM instance-%v\n", uuid.String())
-		done <- nil
-
-	}()
-
-	select {
-	case <-ctx.Done():
-		log.Println("createVM timeout/err", ctx.Err())
-		return ctx.Err()
-	case err := <-done:
-		if err != nil {
-			log.Println(err)
-		}
+	uuid := uuid.New()
+	log.Printf("Creating VM instance-%v\n", uuid.String())
+	if err := genconfig.GenQcow2DiskImage(uuid.String()); err != nil {
+		log.Println(err)
 		return err
 	}
+
+	if err := genconfig.GenMetaDataInstanceConfig(uuid.String()); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if err := genconfig.GenUserDataInstanceConfig(uuid.String(), os.Getenv("SSH_PUBLIC_KEY")); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if err := genconfig.GenCdRomDiskImage(uuid.String()); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	virtInstanceConfigPath, err := genconfig.GenVirtInstanceConfig(uuid.String())
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	// read xml file and then register
+	xmlBytes, err := os.ReadFile(virtInstanceConfigPath)
+	if err != nil {
+		log.Fatalf("Failed to read XML file: %v", err)
+	}
+
+	domainXML := string(xmlBytes)
+
+	domain, err := m.conn.DomainDefineXML(domainXML)
+	if err != nil {
+		log.Fatalf("Failed to define domain: %v", err)
+		return err
+	}
+
+	instanceId := "instance-" + uuid.String()
+	instanceMng := instance.NewVirtInstanceManager(domain, instanceId)
+
+	m.Lock()
+	m.MapInstanceIdToInstance[instanceId] = instanceMng
+	m.Unlock()
+
+	if err := domain.Create(); err != nil {
+		return err
+	}
+
+	if m.loadBalancer != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			instanceMng.RegisterIP(os.Getenv("LOAD_BALANCER_URL"), ctx)
+		}()
+	}
+
+	log.Printf("Created VM instance-%v\n", uuid.String())
+	return nil
 
 }
 
