@@ -54,8 +54,15 @@ func (m *VirtController) ScaleUp(numToAdd int) {
 	defer m.Unlock()
 
 	var wg sync.WaitGroup
-	//ctx, cancel := context.WithTimeout(context.Background(), m.ScaleUpCoolDown)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+	coldStartTimeout, err := strconv.Atoi(os.Getenv("COLD_START_TIMEOUT_MIN"))
+	if err != nil {
+		log.Println(err)
+	}
+
+	ctxTimeout := time.Duration(coldStartTimeout) * time.Minute
+
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	now := time.Now()
