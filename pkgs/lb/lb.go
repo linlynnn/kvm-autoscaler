@@ -287,5 +287,6 @@ func (lb *LoadBalancer) DeRegisterHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	lb.deRegister(deRegisterBackendRequest.URL)
+	w.WriteHeader(http.StatusAccepted)
 
 }

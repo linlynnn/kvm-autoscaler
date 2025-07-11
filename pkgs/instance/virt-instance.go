@@ -177,13 +177,7 @@ func (d *VirtInstanceManager) DeRegisterIP(lbUrl string) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Println("Error reading response:", err)
-		return
-	}
-
-	log.Printf("DeRegisterIP response: %s\n", string(body))
+	log.Printf("DeRegisterIP response: %s\n", resp.Status)
 }
 
 func (d *VirtInstanceManager) Shutdown() error {
