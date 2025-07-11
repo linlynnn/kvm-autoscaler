@@ -94,7 +94,7 @@ func (m *VirtController) ScaleDown(instancesToRemove []instance.InstanceManager)
 
 	var wg sync.WaitGroup
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	if now.Sub(m.LastScaleDown) < m.ScaleDownCoolDown {
@@ -263,7 +263,7 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, ctx c
 
 	select {
 	case <-ctx.Done():
-		log.Println("GracefullyShutdown context cancel %s\n", inst.GetID())
+		log.Printf("GracefullyShutdown context cancel %s\n", inst.GetID())
 		return ctx.Err()
 
 	case err := <-done:
