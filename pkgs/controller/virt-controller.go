@@ -192,7 +192,7 @@ func (m *VirtController) createVM(ctx context.Context, wg *sync.WaitGroup) error
 
 	select {
 	case <-ctx.Done():
-		log.Println("createVM timeout/err", ctx.Err())
+		log.Println("createVM timeout", ctx.Err())
 		return ctx.Err()
 	case err := <-done:
 		if err != nil {
