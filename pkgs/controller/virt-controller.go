@@ -159,9 +159,14 @@ func (m *VirtController) createVM(wg *sync.WaitGroup) error {
 	m.MapInstanceIdToInstance[instanceId] = instanceMng
 	m.Unlock()
 
-	if err := domain.Create(); err != nil {
-		return err
-	}
+	go func() {
+		log.Printf("Creating domain %s\n", instanceId)
+		if err := domain.Create(); err != nil {
+			log.Println(err)
+		}
+		log.Printf("Created domain %s\n", instanceId)
+
+	}()
 
 	if m.loadBalancer != nil {
 		go func() {
