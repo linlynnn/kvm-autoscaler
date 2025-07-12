@@ -50,30 +50,27 @@ func NewVirtController(
 }
 
 func (m *VirtController) ScaleUp(numToAdd int) {
-	m.Lock()
-	defer m.Unlock()
-
-	var wg sync.WaitGroup
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	now := time.Now()
 
+	m.Lock()
 	if now.Sub(m.LastScaleUp) < m.ScaleUpCoolDown {
-		// ScaleUp is cooldown
-		log.Println("ScaleUp is cooldown")
+		log.Println("ScaleUp is cooldown, last action", m.LastScaleUp)
+		m.Unlock()
 		return
 	}
+	m.Unlock()
 
 	log.Printf("Start ScaleUp %d\n", numToAdd)
+	m.Lock()
 	m.LastScaleUp = now
 	m.LastScaleDown = now
-	// ScaleUp logic
+	m.Unlock()
+
+	var wg sync.WaitGroup
 	for i := 0; i < numToAdd; i++ {
-		// can be concurrent
 		wg.Add(1)
-		go m.createVM(ctx, &wg)
+		go m.createVM(&wg)
 	}
 
 	wg.Wait()
@@ -81,188 +78,141 @@ func (m *VirtController) ScaleUp(numToAdd int) {
 }
 
 func (m *VirtController) ScaleDown(instancesToRemove []instance.InstanceManager) {
-	m.Lock()
-	defer m.Unlock()
 	now := time.Now()
 
-	var wg sync.WaitGroup
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
+	m.Lock()
 	if now.Sub(m.LastScaleDown) < m.ScaleDownCoolDown {
-		// ScaleDown is cooldown
-		log.Println("ScaleDown is cooldown")
+		log.Println("ScaleDown is cooldown, last action", m.LastScaleDown)
+		m.Unlock()
 		return
 	}
+	m.Unlock()
 
-	// ScaleDown logic
-	log.Println("Start ScaleDown")
+	log.Printf("Start ScaleDown %d\n", len(instancesToRemove))
+	m.Lock()
 	m.LastScaleDown = now
-	for _, instance := range instancesToRemove {
-		// can be concurrent
+	m.Unlock()
 
+	var wg sync.WaitGroup
+	for _, instance := range instancesToRemove {
 		wg.Add(1)
-		go m.gracefullyShutdown(instance, ctx, &wg)
+		go m.gracefullyShutdown(instance, &wg)
 
 	}
 	wg.Wait()
 
 }
 
-func (m *VirtController) createVM(ctx context.Context, wg *sync.WaitGroup) error {
+func (m *VirtController) createVM(wg *sync.WaitGroup) error {
+
 	defer wg.Done()
-
-	done := make(chan error, 1)
-
-	go func() {
-		uuid := uuid.New()
-		log.Printf("Creating VM instance-%v\n", uuid.String())
-		if err := genconfig.GenQcow2DiskImage(uuid.String()); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		if err := genconfig.GenMetaDataInstanceConfig(uuid.String()); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		if err := genconfig.GenUserDataInstanceConfig(uuid.String(), os.Getenv("SSH_PUBLIC_KEY")); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		if err := genconfig.GenCdRomDiskImage(uuid.String()); err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		virtInstanceConfigPath, err := genconfig.GenVirtInstanceConfig(uuid.String())
-		if err != nil {
-			log.Println(err)
-			done <- err
-			return
-		}
-
-		// read xml file and then register
-		xmlBytes, err := os.ReadFile(virtInstanceConfigPath)
-		if err != nil {
-			log.Fatalf("Failed to read XML file: %v", err)
-			done <- err
-		}
-
-		domainXML := string(xmlBytes)
-
-		domain, err := m.conn.DomainDefineXML(domainXML)
-		if err != nil {
-			log.Fatalf("Failed to define domain: %v", err)
-			done <- err
-			return
-		}
-
-		instanceId := "instance-" + uuid.String()
-		instanceMng := instance.NewVirtInstanceManager(domain, instanceId)
-
-		m.Lock()
-		m.MapInstanceIdToInstance[instanceId] = instanceMng
-		m.Unlock()
-
-		if err := domain.Create(); err != nil {
-			done <- err
-			return
-		}
-
-		if m.loadBalancer != nil {
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-				defer cancel()
-				instanceMng.RegisterIP(os.Getenv("LOAD_BALANCER_URL"), ctx)
-			}()
-		}
-
-		log.Printf("Created VM instance-%v\n", uuid.String())
-		done <- nil
-
-	}()
-
-	select {
-	case <-ctx.Done():
-		log.Println("createVM timeout", ctx.Err())
-		return ctx.Err()
-	case err := <-done:
-		if err != nil {
-			log.Println(err)
-		}
+	uuid := uuid.New()
+	log.Printf("Creating VM instance-%v\n", uuid.String())
+	if err := genconfig.GenQcow2DiskImage(uuid.String()); err != nil {
+		log.Println(err)
 		return err
 	}
 
+	if err := genconfig.GenMetaDataInstanceConfig(uuid.String()); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if err := genconfig.GenUserDataInstanceConfig(uuid.String(), os.Getenv("SSH_PUBLIC_KEY")); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if err := genconfig.GenCdRomDiskImage(uuid.String()); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	virtInstanceConfigPath, err := genconfig.GenVirtInstanceConfig(uuid.String())
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	// read xml file and then register
+	xmlBytes, err := os.ReadFile(virtInstanceConfigPath)
+	if err != nil {
+		log.Fatalf("Failed to read XML file: %v", err)
+	}
+
+	domainXML := string(xmlBytes)
+
+	domain, err := m.conn.DomainDefineXML(domainXML)
+	if err != nil {
+		log.Fatalf("Failed to define domain: %v", err)
+		return err
+	}
+
+	instanceId := "instance-" + uuid.String()
+	instanceMng := instance.NewVirtInstanceManager(domain, instanceId)
+
+	m.Lock()
+	m.MapInstanceIdToInstance[instanceId] = instanceMng
+	m.Unlock()
+
+	if err := domain.Create(); err != nil {
+		log.Println(err)
+	}
+
+	if m.loadBalancer != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			instanceMng.RegisterIP(os.Getenv("LOAD_BALANCER_URL"), ctx)
+		}()
+	}
+
+	log.Printf("Created VM instance-%v\n", uuid.String())
+	return nil
+
 }
 
-func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, ctx context.Context, wg *sync.WaitGroup) error {
+func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, wg *sync.WaitGroup) error {
 	defer wg.Done()
 	// need to ensure that instance must shut off
-	done := make(chan error, 1)
+	// deregisterIP
+	if m.loadBalancer != nil {
 
-	go func() {
-
-		// deregisterIP
-		if m.loadBalancer != nil {
-
-			loadBalancerUrl := os.Getenv("LOAD_BALANCER_URL")
-			if loadBalancerUrl == "" {
-				log.Println("LOAD_BALANCER_URL is not defined")
-				return
+		go func() {
+			loadBalancerUrlEnv := os.Getenv("LOAD_BALANCER_URL")
+			if loadBalancerUrlEnv == "" {
+				log.Println("LOAD_BALANCER_URL is not defined, use fallback value: http://localhost:8080")
+				loadBalancerUrlEnv = "http://localhost:8080"
 			}
 
-			inst.DeRegisterIP(loadBalancerUrl)
+			inst.DeRegisterIP(loadBalancerUrlEnv)
 
-			drainingTime := os.Getenv("DRAINING_TIME_SEC")
-			if drainingTime == "" {
-				log.Println("DRAINING_TIME is not defined")
-				return
+			drainingTimeEnv := os.Getenv("DRAINING_TIME_SEC")
+			if drainingTimeEnv == "" {
+				log.Println("DRAINING_TIME is not defined, use fallback value: 30")
+				drainingTimeEnv = "30"
 			}
 
-			drainingTimeInt, err := strconv.Atoi(drainingTime)
+			drainingTime, err := strconv.Atoi(drainingTimeEnv)
 			if err != nil {
 				log.Println(err)
 				return
 			}
 
 			log.Printf("Draining connection %s\n", inst.GetID())
-			time.Sleep(time.Duration(drainingTimeInt) * time.Second)
-
-		}
-
-		err := inst.Shutdown()
-		if err != nil {
-			done <- err
-		}
-
-		m.Lock()
-		delete(m.MapInstanceIdToInstance, inst.GetID())
-		m.Unlock()
-
-		done <- nil
-
-	}()
-
-	select {
-	case <-ctx.Done():
-		log.Printf("GracefullyShutdown context cancel %s\n", inst.GetID())
-		return ctx.Err()
-
-	case err := <-done:
-		if err != nil {
-			log.Println(err)
-			return err
-		}
+			time.Sleep(time.Duration(drainingTime) * time.Second)
+		}()
 
 	}
+
+	if err := inst.Shutdown(); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	m.Lock()
+	delete(m.MapInstanceIdToInstance, inst.GetID())
+	m.Unlock()
 
 	return nil
 
