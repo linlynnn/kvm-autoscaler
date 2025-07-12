@@ -83,7 +83,13 @@ OuterLoop:
 
 	d.ipAddress = ipAddress
 
-	coldStartTimeout, err := strconv.Atoi(os.Getenv("COLD_START_TIMEOUT_MIN"))
+	coldStartTimeoutEnv := os.Getenv("COLD_START_TIMEOUT_MIN")
+	if coldStartTimeoutEnv == "" {
+		log.Println("COLD_START_TIMEOUT_MIN is not defined, use fallback value 8")
+		coldStartTimeoutEnv = "8"
+	}
+
+	coldStartTimeout, err := strconv.Atoi(coldStartTimeoutEnv)
 	if err != nil {
 		log.Println(err)
 	}
