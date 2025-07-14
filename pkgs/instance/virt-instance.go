@@ -223,7 +223,7 @@ func (d *VirtInstanceManager) RegisterPromDiscovery() {
 	log.Printf("[RegisterPrometheusDiscovery] Wait for vm %s startup application for %d minute\n", d.ipAddress, coldStartTimeout)
 	time.Sleep(time.Duration(coldStartTimeout) * time.Minute)
 
-	discoveryUrl := "localhost:9093"
+	discoveryUrl := "http://localhost:9093/targets/node_exporter"
 
 	payload := map[string]string{
 		"url": d.ipAddress + ":9100",
@@ -249,7 +249,7 @@ func (d *VirtInstanceManager) RegisterPromDiscovery() {
 }
 
 func (d *VirtInstanceManager) DeRegisterPromDiscovery() {
-	discoveryUrl := "localhost:9093"
+	discoveryUrl := "http://localhost:9093/targets/node_exporter"
 
 	payload := map[string]string{
 		"url": d.ipAddress + ":9100",
