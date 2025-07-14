@@ -189,19 +189,19 @@ func (d *VirtInstanceManager) DeRegisterIP(lbUrl string) {
 func (d *VirtInstanceManager) Shutdown() error {
 	// virt shutdown implementation
 
-	log.Printf("Shutting Down VM %s\n", d.GetID())
+	log.Printf("[Shutdown] Shutting Down VM %s\n", d.GetID())
 	if err := d.domain.Destroy(); err != nil {
 		log.Println(err)
 		return err
 	}
-	log.Printf("Shut off VM %s\n", d.GetID())
+	log.Printf("[Shutdown] Shut off VM %s\n", d.GetID())
 
-	log.Printf("Undefining VM %s\n", d.GetID())
+	log.Printf("[Shutdown] Undefining VM %s\n", d.GetID())
 	if err := d.domain.Undefine(); err != nil {
 		log.Println(err)
 		return err
 	}
-	log.Printf("Undefined VM %s\n", d.GetID())
+	log.Printf("[Shutdown] Undefined VM %s\n", d.GetID())
 
 	return nil
 

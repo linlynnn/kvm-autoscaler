@@ -24,7 +24,7 @@ func New(loadBalancer *lb.LoadBalancer) *KVMAutoScaler {
 
 	conn, err := libvirt.NewConnect("qemu:///system")
 	if err != nil {
-		log.Fatalf("Failed to connect to hypervisor: %v", err)
+		log.Fatalf("[KVMAutoScaler] Failed to connect to hypervisor: %v", err)
 	}
 
 	virtController := controller.NewVirtController(
@@ -52,7 +52,7 @@ func (a *KVMAutoScaler) AttachPolicy(policies []policy.ScalingPolicy) {
 func (a *KVMAutoScaler) Run() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatal("[KVMAutoScaler] Error loading .env file")
 	}
 
 	var wg sync.WaitGroup

@@ -55,13 +55,13 @@ func (m *VirtController) ScaleUp(numToAdd int) {
 
 	m.Lock()
 	if now.Sub(m.LastScaleUp) < m.ScaleUpCoolDown {
-		log.Println("ScaleUp is cooldown, last action", m.LastScaleUp)
+		log.Println("[VirtController] ScaleUp is cooldown, last action", m.LastScaleUp)
 		m.Unlock()
 		return
 	}
 	m.Unlock()
 
-	log.Printf("Start ScaleUp %d\n", numToAdd)
+	log.Printf("[VirtController] Start ScaleUp %d\n", numToAdd)
 	m.Lock()
 	m.LastScaleUp = now
 	m.LastScaleDown = now
@@ -82,13 +82,13 @@ func (m *VirtController) ScaleDown(instancesToRemove []instance.InstanceManager)
 
 	m.Lock()
 	if now.Sub(m.LastScaleDown) < m.ScaleDownCoolDown {
-		log.Println("ScaleDown is cooldown, last action", m.LastScaleDown)
+		log.Println("[VirtController] ScaleDown is cooldown, last action", m.LastScaleDown)
 		m.Unlock()
 		return
 	}
 	m.Unlock()
 
-	log.Printf("Start ScaleDown %d\n", len(instancesToRemove))
+	log.Printf("[VirtController] Start ScaleDown %d\n", len(instancesToRemove))
 	m.Lock()
 	m.LastScaleDown = now
 	m.Unlock()
@@ -107,7 +107,7 @@ func (m *VirtController) createVM(wg *sync.WaitGroup) error {
 
 	defer wg.Done()
 	uuid := uuid.New()
-	log.Printf("Creating VM instance-%v\n", uuid.String())
+	log.Printf("[VirtController] Creating VM instance-%v\n", uuid.String())
 	if err := genconfig.GenQcow2DiskImage(uuid.String()); err != nil {
 		log.Println(err)
 		return err
@@ -137,14 +137,14 @@ func (m *VirtController) createVM(wg *sync.WaitGroup) error {
 	// read xml file and then register
 	xmlBytes, err := os.ReadFile(virtInstanceConfigPath)
 	if err != nil {
-		log.Fatalf("Failed to read XML file: %v", err)
+		log.Printf("[VirtController] Failed to read XML file: %v\n", err)
 	}
 
 	domainXML := string(xmlBytes)
 
 	domain, err := m.conn.DomainDefineXML(domainXML)
 	if err != nil {
-		log.Fatalf("Failed to define domain: %v", err)
+		log.Printf("[VirtController] Failed to define domain: %v\n", err)
 		return err
 	}
 
@@ -171,7 +171,7 @@ func (m *VirtController) createVM(wg *sync.WaitGroup) error {
 		instanceMng.RegisterPromDiscovery()
 	}()
 
-	log.Printf("Created VM instance-%v\n", uuid.String())
+	log.Printf("[VirtController] Created VM instance-%v\n", uuid.String())
 	return nil
 
 }
@@ -185,7 +185,7 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, wg *s
 		go func() {
 			loadBalancerUrlEnv := os.Getenv("LOAD_BALANCER_URL")
 			if loadBalancerUrlEnv == "" {
-				log.Println("LOAD_BALANCER_URL is not defined, use fallback value: http://localhost:8080")
+				log.Println("[VirtController] LOAD_BALANCER_URL is not defined, use fallback value: http://localhost:8080")
 				loadBalancerUrlEnv = "http://localhost:8080"
 			}
 
@@ -193,7 +193,7 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, wg *s
 
 			drainingTimeEnv := os.Getenv("DRAINING_TIME_SEC")
 			if drainingTimeEnv == "" {
-				log.Println("DRAINING_TIME is not defined, use fallback value: 30")
+				log.Println("[VirtController] DRAINING_TIME is not defined, use fallback value: 30")
 				drainingTimeEnv = "30"
 			}
 
@@ -203,7 +203,7 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, wg *s
 				return
 			}
 
-			log.Printf("Draining connection %s\n", inst.GetID())
+			log.Printf("[VirtController] Draining connection %s\n", inst.GetID())
 			time.Sleep(time.Duration(drainingTime) * time.Second)
 		}()
 
@@ -245,8 +245,8 @@ func (m *VirtController) GetRunningInstance() (int, []instance.InstanceManager, 
 }
 
 func (m *VirtController) Close() {
-	log.Println("Closing virt connection")
+	log.Println("[VirtController] Closing virt connection")
 	m.conn.Close()
-	log.Println("Closed virt connection")
+	log.Println("[VirtController] Closed virt connection")
 
 }

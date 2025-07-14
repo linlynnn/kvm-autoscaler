@@ -32,12 +32,12 @@ func NewLoadBalancer(address string) *LoadBalancer {
 	}
 }
 
-func (lb *LoadBalancer) loadCpuUtilBackend(BackendURL string, Cores int, Util int, Timeout int) {
+func (lb *LoadBalancer) loadCpuUtilBackend(backendURL string, cores int, util int, timeout int) {
 
 	payload := map[string]int{
-		"cores":   Cores,
-		"util":    Util,
-		"timeout": Timeout,
+		"cores":   cores,
+		"util":    util,
+		"timeout": timeout,
 	}
 
 	jsonData, err := json.Marshal(payload)
@@ -45,13 +45,13 @@ func (lb *LoadBalancer) loadCpuUtilBackend(BackendURL string, Cores int, Util in
 		panic(err)
 	}
 
-	resp, err := http.Post(BackendURL, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(backendURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		panic(err)
 	}
 	defer resp.Body.Close()
 
-	log.Println(resp.StatusCode)
+	log.Printf("[LoadBalancer] load cpu backend %s: %s\n", backendURL, resp.Status)
 
 }
 
@@ -107,7 +107,7 @@ func (lb *LoadBalancer) Run() {
 	r.Delete("/backend", lb.DeRegisterHandler)
 	r.Post("/load/cpu", lb.LoadCpuUtilHandler)
 
-	log.Printf("Load balancer running on %s\n", lb.address)
+	log.Printf("[LoadBalancer] Load balancer running on %s\n", lb.address)
 	log.Println(http.ListenAndServe(lb.address, r))
 
 }
@@ -149,11 +149,11 @@ func (lb *LoadBalancer) registerBackend(ipAddress string) {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 
-	log.Printf("Registering backend %s\n", ipAddress)
+	log.Printf("[LoadBalancer] Registering backend %s\n", ipAddress)
 	newBackend := NewBackend(ipAddress)
 	// start healthcheck the backend
 	lb.backends = append(lb.backends, newBackend)
-	log.Printf("Registered backend %s\n", ipAddress)
+	log.Printf("[LoadBalancer] Registered backend %s\n", ipAddress)
 
 	go lb.startHealthCheck(newBackend, 5*time.Second)
 
@@ -177,14 +177,14 @@ func (lb *LoadBalancer) RegisterBackendHandler(w http.ResponseWriter, r *http.Re
 
 func (lb *LoadBalancer) startHealthCheck(backend *Backend, interval time.Duration) {
 
-	log.Printf("Waiting for startup backend %s for 1 minute\n", backend.URL.String())
+	log.Printf("[LoadBalancer] Waiting for startup backend %s for 1 minute\n", backend.URL.String())
 	time.Sleep(1 * time.Minute)
-	log.Printf("Start health check %s\n", backend.URL.String())
+	log.Printf("[LoadBalancer] Start health check %s\n", backend.URL.String())
 
 	for {
 		resp, err := http.Get(backend.URL.String() + "/health")
 		if err != nil || resp.StatusCode != http.StatusOK {
-			log.Printf("%s Not Alive", backend.URL.String())
+			log.Printf("[LoadBalancer] %s Not Alive", backend.URL.String())
 			backend.SetStateAlive(false)
 			lb.deRegister(backend.URL.String())
 			break
@@ -250,12 +250,12 @@ func (lb *LoadBalancer) deRegister(url string) {
 
 	if idxToRemove == -1 {
 		lb.mu.Unlock()
-		log.Printf("deRegister: no backend %s\n", url)
+		log.Printf("[LoadBalancer] deRegister: no backend %s\n", url)
 		return
 	}
 
 	backendToRemove.SetStateDraining(true)
-	log.Printf("Draining %s\n", url)
+	log.Printf("[LoadBalancer] Draining %s\n", url)
 
 	lb.mu.Unlock()
 
@@ -268,7 +268,7 @@ func (lb *LoadBalancer) deRegister(url string) {
 				break
 			}
 		}
-		log.Printf("Deregistered %s\n", url)
+		log.Printf("[LoadBalancer] Deregistered %s\n", url)
 		lb.mu.Unlock()
 
 	}()
