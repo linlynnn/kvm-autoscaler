@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/linlynnn/kvm-autoscaler/pkgs/controller"
+	"github.com/linlynnn/kvm-autoscaler/pkgs/discovery"
 	"github.com/linlynnn/kvm-autoscaler/pkgs/lb"
 	"github.com/linlynnn/kvm-autoscaler/pkgs/policy"
 	"libvirt.org/go/libvirt"
@@ -63,9 +64,11 @@ func (a *KVMAutoScaler) Run() {
 	}
 
 	if a.loadBalancer != nil {
-		wg.Add(1)
 		go a.loadBalancer.Run()
 	}
+
+	sDiscovery := discovery.NewPromServiceDiscovery()
+	go sDiscovery.Run()
 
 	wg.Wait()
 	a.vmController.Close()
