@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -35,10 +34,10 @@ func NewLoadBalancer(address string) *LoadBalancer {
 
 func (lb *LoadBalancer) loadCpuUtilBackend(BackendURL string, Cores int, Util int, Timeout int) {
 
-	payload := map[string]string{
-		"cores":   strconv.Itoa(Cores),
-		"util":    strconv.Itoa(Util),
-		"timeout": strconv.Itoa(Timeout),
+	payload := map[string]int{
+		"cores":   Cores,
+		"util":    Util,
+		"timeout": Timeout,
 	}
 
 	jsonData, err := json.Marshal(payload)
