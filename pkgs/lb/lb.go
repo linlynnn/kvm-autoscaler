@@ -42,12 +42,14 @@ func (lb *LoadBalancer) loadCpuUtilBackend(backendURL string, cores int, util in
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 
 	resp, err := http.Post(backendURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
