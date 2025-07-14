@@ -12,6 +12,8 @@ type InstanceManager interface {
 	Shutdown() error
 	RegisterIP(string, context.Context)
 	DeRegisterIP(string)
+	RegisterPromDiscovery()
+	DeRegisterPromDiscovery()
 }
 
 type VMState int

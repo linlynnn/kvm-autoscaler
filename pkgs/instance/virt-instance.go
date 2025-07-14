@@ -44,7 +44,7 @@ func (d *VirtInstanceManager) GetID() string {
 
 func (d *VirtInstanceManager) RegisterIP(lbUrl string, ctx context.Context) {
 
-	log.Printf("Registering IP for VM %s\n", d.GetID())
+	log.Printf("[RegisterIP] Registering IP for VM %s\n", d.GetID())
 	//timeout := time.After(1 * time.Minute)
 	tick := time.Tick(2 * time.Second)
 	var ipAddress string
@@ -53,20 +53,20 @@ OuterLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("Timeout: no IP found for VM %s\n", d.GetID())
+			log.Printf("[RegisterIP] Timeout: no IP found for VM %s\n", d.GetID())
 			return
 
 		case <-tick:
 			ifaces, err := d.domain.ListAllInterfaceAddresses(libvirt.DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE)
 			if err != nil {
-				log.Printf("Retrying... failed to get interface addresses: %v", err)
+				log.Printf("[RegisterIP] Retrying... failed to get interface addresses: %v", err)
 				continue
 			}
 
 			for _, iface := range ifaces {
 				for _, addr := range iface.Addrs {
 					if addr.Addr != "" {
-						log.Printf("Found IP for VM %s: %s\n", d.GetID(), addr.Addr)
+						log.Printf("[RegisterIP] Found IP for VM %s: %s\n", d.GetID(), addr.Addr)
 						ipAddress = addr.Addr
 						// TODO: register/store this IP in your system
 
@@ -85,7 +85,7 @@ OuterLoop:
 
 	coldStartTimeoutEnv := os.Getenv("COLD_START_TIMEOUT_MIN")
 	if coldStartTimeoutEnv == "" {
-		log.Println("COLD_START_TIMEOUT_MIN is not defined, use fallback value 8")
+		log.Println("[RegisterIP] COLD_START_TIMEOUT_MIN is not defined, use fallback value 8")
 		coldStartTimeoutEnv = "8"
 	}
 
@@ -94,7 +94,7 @@ OuterLoop:
 		log.Println(err)
 	}
 
-	log.Printf("Wait for vm %s startup application for %d minute\n", ipAddress, coldStartTimeout)
+	log.Printf("[RegisterIP] Wait for vm %s startup application for %d minute\n", ipAddress, coldStartTimeout)
 	time.Sleep(time.Duration(coldStartTimeout) * time.Minute)
 
 	lbUrl = lbUrl + "/backend"
@@ -119,13 +119,13 @@ OuterLoop:
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response:", err)
+		fmt.Println("[RegisterIP] Error reading response:", err)
 		return
 	}
 
-	log.Printf("RegisterIP response %s\n", string(body))
+	log.Printf("[RegisterIP] RegisterIP response %s\n", string(body))
 
-	log.Printf("Done RegisteringIP %s\n", d.GetID())
+	log.Printf("[RegisterIP] Done RegisteringIP %s\n", d.GetID())
 
 }
 
@@ -164,13 +164,13 @@ func (d *VirtInstanceManager) DeRegisterIP(lbUrl string) {
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		log.Println("Error marshaling payload:", err)
+		log.Println("[DeRegisterIP] Error marshaling payload:", err)
 		return
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, lbUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Println("Error creating DELETE request:", err)
+		log.Println("[DeRegisterIP] Error creating DELETE request:", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -178,12 +178,12 @@ func (d *VirtInstanceManager) DeRegisterIP(lbUrl string) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("Error performing DELETE request:", err)
+		log.Println("[DeRegisterIP] Error performing DELETE request:", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	log.Printf("DeRegisterIP response: %s\n", resp.Status)
+	log.Printf("[DeRegisterIP] DeRegisterIP response: %s\n", resp.Status)
 }
 
 func (d *VirtInstanceManager) Shutdown() error {
@@ -204,5 +204,78 @@ func (d *VirtInstanceManager) Shutdown() error {
 	log.Printf("Undefined VM %s\n", d.GetID())
 
 	return nil
+
+}
+
+func (d *VirtInstanceManager) RegisterPromDiscovery() {
+
+	coldStartTimeoutEnv := os.Getenv("COLD_START_TIMEOUT_MIN")
+	if coldStartTimeoutEnv == "" {
+		log.Println("[RegisterPrometheusDiscovery] COLD_START_TIMEOUT_MIN is not defined, use fallback value 8")
+		coldStartTimeoutEnv = "8"
+	}
+
+	coldStartTimeout, err := strconv.Atoi(coldStartTimeoutEnv)
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Printf("[RegisterPrometheusDiscovery] Wait for vm %s startup application for %d minute\n", d.ipAddress, coldStartTimeout)
+	time.Sleep(time.Duration(coldStartTimeout) * time.Minute)
+
+	discoveryUrl := "localhost:9093"
+
+	payload := map[string]string{
+		"url": d.ipAddress + ":9100",
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		log.Println("[RegisterPrometheusDiscovery] Error marshaling payload:", err)
+		return
+	}
+
+	resp, err := http.Post(discoveryUrl, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	log.Printf("[RegisterPrometheusDiscovery] Register Prometheus Discovery response %s\n", string(resp.Status))
+
+	log.Printf("[RegisterPrometheusDiscovery] Done Registering Prometheus Discovery %s\n", d.GetID())
+
+}
+
+func (d *VirtInstanceManager) DeRegisterPromDiscovery() {
+	discoveryUrl := "localhost:9093"
+
+	payload := map[string]string{
+		"url": d.ipAddress + ":9100",
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		log.Println("[DeRegisterPromDiscovery] Error marshaling payload:", err)
+		return
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, discoveryUrl, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Println("[DeRegisterPromDiscovery] Error creating DELETE request:", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("[DeRegisterPromDiscovery] Error performing DELETE request:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	log.Printf("[DeRegisterPromDiscovery] DeRegister Prometheus Discovery response: %s\n", resp.Status)
 
 }
