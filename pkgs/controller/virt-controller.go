@@ -167,6 +167,10 @@ func (m *VirtController) createVM(wg *sync.WaitGroup) error {
 		}()
 	}
 
+	go func() {
+		instanceMng.RegisterPromDiscovery()
+	}()
+
 	log.Printf("Created VM instance-%v\n", uuid.String())
 	return nil
 
@@ -204,6 +208,10 @@ func (m *VirtController) gracefullyShutdown(inst instance.InstanceManager, wg *s
 		}()
 
 	}
+
+	go func() {
+		inst.DeRegisterPromDiscovery()
+	}()
 
 	if err := inst.Shutdown(); err != nil {
 		log.Println(err)
