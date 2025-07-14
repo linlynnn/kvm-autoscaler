@@ -109,7 +109,7 @@ func (lb *LoadBalancer) Run() {
 	r.Post("/load/cpu", lb.LoadCpuUtilHandler)
 
 	log.Printf("Load balancer running on %s\n", lb.address)
-	log.Fatal(http.ListenAndServe(lb.address, r))
+	log.Println(http.ListenAndServe(lb.address, r))
 
 }
 
